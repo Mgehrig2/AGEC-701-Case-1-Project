@@ -1,0 +1,37 @@
+import pandas as pd
+
+# Load Delivery and Drivers data from Excel files
+delivery_data = pd.read_excel("Delivery(1).xlsx")
+drivers_data = pd.read_excel("Drivers(1).xlsx")
+
+# Convert 'Order Date' and Time Columns to Datetime
+delivery_data['Order Date'] = pd.to_datetime(delivery_data['Order Date'])
+delivery_data['Expected Delivery By'] = pd.to_datetime(
+    delivery_data['Order Date'].astype(str) + ' ' + delivery_data['Expected Delivery By'].astype(str)
+)
+delivery_data['Actual Delivery Time'] = pd.to_datetime(
+    delivery_data['Order Date'].astype(str) + ' ' + delivery_data['Actual Delivery Time'].astype(str)
+)
+
+# Calculate Delivery Delay (mins) and Count Late Deliveries
+delivery_data['Delivery Delay (mins)'] = (delivery_data['Actual Delivery Time'] - delivery_data['Expected Delivery By']).dt.total_seconds() / 60
+delivery_data['Is Late'] = delivery_data['Delivery Delay (mins)'] > 0  # True if delay is positive
+
+# Calculate Average Delay and Number of Late Deliveries per Driver
+# Group by Driver ID and calculate average delay and count of late deliveries
+driver_delay_summary = delivery_data.groupby('Driver ID').agg(
+    Average_Delay_Mins=('Delivery Delay (mins)', 'mean'),
+    Times_Late=('Is Late', 'sum')
+).reset_index()
+
+# Merge with Driver Information to Include Name
+driver_performance = pd.merge(driver_delay_summary, drivers_data, left_on='Driver ID', right_on='ID').drop(columns='ID')
+driver_performance = driver_performance[['Driver ID', 'First Name', 'Last Name', 'Average_Delay_Mins', 'Times_Late']]
+
+# Export Results to Excel
+output_path = "AGEC_701_Google_Colab_Results.xlsx"
+with pd.ExcelWriter(output_path) as writer:
+    delivery_data.to_excel(writer, sheet_name='Processed Delivery Data', index=False)
+    driver_performance.to_excel(writer, sheet_name='Driver Performance Summary', index=False)
+
+print("Analysis complete. Results saved to:", output_path)
